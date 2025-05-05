@@ -20,7 +20,7 @@ const testimonials: Testimonial[] = [
     name: 'juliana nascimento',
     photo: 'https://randomuser.me/api/portraits/women/56.jpg',
     rating: 5,
-    comment: 'melhor investimento que fiz, tenho tudo na minha tv e celular por um valor simbólico, obrigado por existir cineflick s2',
+    comment: 'Melhor investimento que fiz este ano. O produto digital entrega tudo que promete e ainda com um suporte incrível!',
     timeAgo: 'há cerca de 2 horas'
   },
   {
@@ -28,7 +28,7 @@ const testimonials: Testimonial[] = [
     name: 'Rafaela pires',
     photo: 'https://randomuser.me/api/portraits/women/24.jpg',
     rating: 5,
-    comment: 'Estou amando esse aplicativo, muito bom!',
+    comment: 'Simplesmente adorei!',
     timeAgo: 'há 1 dia'
   }
 ];
