@@ -1,13 +1,12 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { sendTelegramNotification } from './telegram-notification';
+import { sendEmail } from './sendEmail';
 
-// Inicializar cliente Supabase
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Definir tipos para o payload do webhook
 interface AsaasWebhookPayload {
   event: string;
   payment: {
@@ -22,48 +21,6 @@ interface AsaasWebhookPayload {
 }
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
-
-// Função para enviar email de notificação
-async function sendAdminNotification(payload: AsaasWebhookPayload, orderDetails: any) {
-  try {
-    if (payload.payment.status !== 'CONFIRMED' || !ADMIN_EMAIL) return;
-
-    const formattedValue = new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(payload.payment.value);
-
-    const customerName = orderDetails?.customer_name || 'Cliente';
-    const productName = orderDetails?.product_name || 'Produto';
-    const paymentMethod = orderDetails?.payment_method || 'Desconhecido';
-
-    const emailResponse = await fetch('/.netlify/functions/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: ADMIN_EMAIL,
-        subject: `🎉 Pagamento Confirmado: ${formattedValue}`,
-        message: `
-          <h2>Novo pagamento confirmado!</h2>
-          <p><strong>Cliente:</strong> ${customerName}</p>
-          <p><strong>Produto:</strong> ${productName}</p>
-          <p><strong>Valor:</strong> ${formattedValue}</p>
-          <p><strong>Método:</strong> ${paymentMethod}</p>
-          <p><strong>ID Asaas:</strong> ${payload.payment.id}</p>
-          <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-        `
-      })
-    });
-
-    if (!emailResponse.ok) {
-      console.error('Erro ao enviar notificação por email:', await emailResponse.text());
-    } else {
-      console.log('Notificação de pagamento enviada com sucesso para', ADMIN_EMAIL);
-    }
-  } catch (error) {
-    console.error('Erro ao enviar notificação:', error);
-  }
-}
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -112,8 +69,6 @@ export const handler: Handler = async (event) => {
       });
 
       if (payload.payment.status === 'CONFIRMED') {
-        await sendAdminNotification(payload, orderData);
-
         const formattedValue = new Intl.NumberFormat('pt-BR', {
           style: 'currency',
           currency: 'BRL'
@@ -121,12 +76,47 @@ export const handler: Handler = async (event) => {
 
         const customerName = orderData?.customer_name || 'Cliente';
 
-        await sendTelegramNotification(`✅ <b>Pagamento Confirmado!</b>
+        await sendTelegramNotification(`✅ <b>Pagamento Confirmado!</b>\n\n📋 <b>Pedido:</b> ${orderData.id}\n👤 <b>Cliente:</b> ${customerName}\n💰 <b>Valor:</b> ${formattedValue}\n🛒 <b>Produto:</b> ${orderData.product_name}`);
 
-📋 <b>Pedido:</b> ${orderData.id}
-👤 <b>Cliente:</b> ${customerName}
-💰 <b>Valor:</b> ${formattedValue}
-🛒 <b>Produto:</b> ${orderData.product_name}`);
+        // Gerar senha numérica aleatória de 8 dígitos
+        const generatedPassword = Math.floor(10000000 + Math.random() * 90000000).toString();
+
+        // Criar usuário no Supabase
+        await supabase.from('users').insert({
+          email: orderData.customer_email,
+          name: orderData.customer_name,
+          password: generatedPassword
+        });
+
+        // Buscar o link de entrega do produto
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('delivery_url')
+          .eq('id', orderData.product_id)
+          .single();
+
+        if (productError || !productData?.delivery_url) {
+          console.warn('Produto sem link de entrega configurado');
+        } else {
+          const deliveryUrl = `${productData.delivery_url}?email=${encodeURIComponent(orderData.customer_email)}`;
+
+          await sendEmail({
+            to: orderData.customer_email,
+            subject: '✅ Acesso ao seu produto foi liberado!',
+            html: `
+              <h2>Olá, ${orderData.customer_name}!</h2>
+              <p>Seu pagamento foi confirmado com sucesso.</p>
+              <p>Acesse seu produto clicando no botão abaixo:</p>
+              <p style="margin-top:16px;">
+                <a href="${deliveryUrl}" target="_blank" style="padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px;">
+                  Acessar agora
+                </a>
+              </p>
+              <p style="margin-top: 24px;"><strong>Usuário:</strong> ${orderData.customer_email}<br><strong>Senha:</strong> ${generatedPassword}</p>
+              <p style="margin-top: 24px;">Qualquer dúvida, estamos à disposição no WhatsApp!</p>
+            `
+          });
+        }
 
         // Enviar conversão para UTMFY
         try {
