@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabaseClientService } from '@/services/supabaseClientService';
@@ -58,12 +57,34 @@ const SuccessPage = () => {
   // Fallback para localStorage se o state for perdido
   useEffect(() => {
     const storedWhatsappNumber = localStorage.getItem('whatsapp_number');
-
     if (storedWhatsappNumber) {
       console.log('[SuccessPage] Recuperando número do WhatsApp do localStorage:', storedWhatsappNumber);
       setWhatsappNumber(storedWhatsappNumber);
     }
   }, []);
+
+  // ✅ Finaliza pagamento via cartão (sem webhook)
+  useEffect(() => {
+    const order = location.state?.order;
+    if (!order || !order.id) return;
+
+    const finalizePayment = async () => {
+      try {
+        const res = await fetch('/.netlify/functions/finalize-card-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id }),
+        });
+
+        const json = await res.json();
+        console.log('[SuccessPage] finalize-card-payment response:', json);
+      } catch (err) {
+        console.error('[SuccessPage] Erro ao finalizar pagamento com cartão:', err);
+      }
+    };
+
+    finalizePayment();
+  }, [location.state]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-gray-50 to-gray-100">
@@ -83,10 +104,8 @@ const SuccessPage = () => {
           <p className="text-gray-700 text-lg">Obrigado pela sua compra. Seu pedido foi confirmado e está sendo processado.</p>
           
           <EmailConfirmationSection />
-          
           <DigitalProductSection isDigital={isDigitalProduct} />
           
-          {/* Show different testimonials based on product type */}
           {isDigitalProduct ? (
             <div className="mt-8 bg-gray-50 p-5 rounded-xl border border-gray-100">
               <h3 className="font-medium text-gray-800 mb-4 text-lg">O que nossos clientes estão dizendo:</h3>
@@ -100,7 +119,6 @@ const SuccessPage = () => {
         <CardFooter className="flex flex-col pb-6 gap-3 pt-4 bg-white">
           <DigitalProductButton isDigital={isDigitalProduct} />
           
-          {/* Exibir o botão de WhatsApp quando houver um número */}
           {whatsappNumber && (
             <div className="w-full">
               <p className="text-sm text-gray-500 mb-2 text-center">
