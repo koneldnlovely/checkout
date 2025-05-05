@@ -20,7 +20,7 @@ const testimonials: Testimonial[] = [
     name: 'juliana nascimento',
     photo: 'https://randomuser.me/api/portraits/women/56.jpg',
     rating: 5,
-    comment: 'Melhor investimento que fiz este ano. O produto digital entrega tudo que promete e ainda com um suporte incrível!',
+    comment: 'Estou impressionada com a qualidade e o atendimento!',
     timeAgo: 'há cerca de 2 horas'
   },
   {
